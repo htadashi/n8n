@@ -12,8 +12,11 @@ import {
 } from 'n8n-workflow';
 
 import {
+    ethBlockNumber,
+    ethGetBlockByNumber,
     ethCallRequest,
     ethSendRawTransaction,
+    ethGetTransactionCount,
     getABIfromEtherscan,
     validateJSON,
 } from './GenericFunctions'
@@ -36,7 +39,7 @@ export class Infura implements INodeType {
         outputs: ['main'],
         credentials: [
             {
-                name: 'infuraApi',
+                name: 'InfuraAPI',
                 required: false,
             },
         ],
@@ -87,13 +90,25 @@ export class Infura implements INodeType {
                 type: 'options',
                 options: [
                     {
-                        name: 'Call',
+                        name: 'Get latest block number',
+                        value: 'eth_blockNumber',
+                    },
+                    {
+                        name: 'Get block by number',
+                        value: 'eth_getBlockByNumber',
+                    },
+                    {
+                        name: 'Call smart contract',
                         value: 'eth_call',
                     },
                     {
                         name: 'Send Raw Transaction',
                         value: 'eth_sendRawTransaction'
-                    }
+                    },
+                    {
+                        name: 'Get Transaction Count',
+                        value: 'eth_getTransactionCount'
+                    },
                 ],
                 default: 'eth_call',
                 required: true,
@@ -103,6 +118,14 @@ export class Infura implements INodeType {
                 displayName: 'Contract address',
                 name: 'contractAddress',
                 type: 'string',
+                displayOptions: {
+                    show: {
+                        operation: [
+                            'eth_call',
+                            'eth_sendRawTransaction',
+                        ],
+                    },
+                },
                 required: true,
                 default: '',
                 description: 'Address of smart contract.',
@@ -168,7 +191,11 @@ export class Infura implements INodeType {
             {
                 displayName: '⛽ Gas Limit',
                 name: 'gasLimit',
-                type: 'string',
+                type: 'number',
+                typeOptions: {
+                    minValue: 0,
+                    numberStepSize: 1,
+                },
                 displayOptions:{
                     show:{
                         operation: [
@@ -177,13 +204,17 @@ export class Infura implements INodeType {
                     },
                 },
                 required: true,
-                default: 500000,
+                default: 21000,
                 description: 'Gas limit for transaction',
             },
             {
-                displayName: '⛽ Gas Price',
+                displayName: '⛽ Gas Price (Gwei)',
                 name: 'gasPrice',
-                type: 'string',
+                type: 'number',
+                typeOptions: {
+                    minValue: 0,
+                    numberStepSize: 1,
+                },                
                 displayOptions:{
                     show:{
                         operation: [
@@ -192,13 +223,21 @@ export class Infura implements INodeType {
                     },
                 },
                 required: true,
-                default: 20000,
+                default: 45,
                 description: 'Gas price for transaction',
             },            
             {
                 displayName: 'Contract ABI',
                 name: 'contractABI',
                 type: 'json',
+                displayOptions: {
+                    show: {
+                        operation: [
+                            'eth_call',
+                            'eth_sendRawTransaction',
+                        ],
+                    },
+                },
                 required: true,
                 default: '',
                 description: 'Contract ABI in JSON format.',                
@@ -207,6 +246,14 @@ export class Infura implements INodeType {
                 displayName: 'Contract Method',
                 name: 'contractMethod',
                 type: 'options',
+                displayOptions: {
+                    show: {
+                        operation: [
+                            'eth_call',
+                            'eth_sendRawTransaction',
+                        ],
+                    },
+                },                
                 typeOptions: {
                     loadOptionsDependsOn: ['contractABI'],
                     loadOptionsMethod: 'getContractMethods',
@@ -219,11 +266,49 @@ export class Infura implements INodeType {
             {
                 displayName: 'Inputs',
                 name: 'contractInputs',
+                displayOptions: {
+                    show: {
+                        operation: [
+                            'eth_call',
+                            'eth_sendRawTransaction',
+                        ],
+                    },
+                },                
                 type: 'json',
                 required: false,
                 default: '',
                 description: 'Inputs of contract method.'
-            }                                          
+            },
+            {
+                displayName: 'Block Number',
+                name: 'blockNumber',
+                displayOptions: {
+                    show: {
+                        operation: [
+                            'eth_getBlockByNumber',
+                        ],
+                    },
+                },
+                required: true,
+                default: 100,
+                type: 'number',
+                description: 'Block number to get information.'
+            }, 
+            {
+                displayName: 'Show transaction details?',
+                name: 'showTransactionDetails',
+                displayOptions: {
+                    show: {
+                        operation: [
+                            'eth_getBlockByNumber',
+                        ],
+                    },
+                },
+                required: true,
+                default: true,
+                type: 'boolean',
+                description: 'If true returns the full transaction objects.',
+            }                                        
         ],
     };
 
@@ -275,12 +360,25 @@ export class Infura implements INodeType {
         const operation = this.getNodeParameter('operation', 0) as string;
         const ETHNetwork = this.getNodeParameter('ETHNetwork', 0) as string;
         const projectID = this.getNodeParameter('projectID', 0) as string;
-        const contractAddress = this.getNodeParameter('contractAddress', 0) as string;
         const walletAddress = this.getNodeParameter('walletAddress', 0) as string;
         
         for (let i = 0; i < length; i++) {
+            if (operation === 'eth_blockNumber'){
+                let response = await ethBlockNumber.call(this, ETHNetwork, projectID);
+                const decodedData = parseInt(response.result, 16);
+
+                responseData = { decodedData };         
+            }
+            if (operation === 'eth_getBlockByNumber'){
+                const blockNumber = this.getNodeParameter('blockNumber', i) as number;
+                const showTransactionDetails = this.getNodeParameter('showTransactionDetails', i) as boolean;
+                let response = await ethGetBlockByNumber.call(this, ETHNetwork, projectID, blockNumber, showTransactionDetails);
+                
+                responseData = response;
+            }
             if (operation === 'eth_call') {
 
+                const contractAddress = this.getNodeParameter('contractAddress', 0) as string;
                 const contractMethod = this.getNodeParameter('contractMethod', i) as string;
                 const contractInputs = this.getNodeParameter('contractInputs', i) as any;
 
@@ -298,7 +396,8 @@ export class Infura implements INodeType {
                 responseData = { decodedData };
             }
             if (operation === 'eth_sendRawTransaction') {
-
+                
+                const contractAddress = this.getNodeParameter('contractAddress', 0) as string;
                 const accessWalletByMnemonic = this.getNodeParameter('accessWalletByMnemonic', i) as boolean;
                 
                 let wallet;
@@ -321,19 +420,31 @@ export class Infura implements INodeType {
                 const iface = new ethers.utils.Interface(ABIjson);
                 const data = iface.encodeFunctionData(contractMethod, validateJSON(contractInputs));
 
-                const gasPrice = this.getNodeParameter('gasPrice', i) as string;
-                const gasLimit = this.getNodeParameter('gasLimit', i) as any;
+                const gasPrice = this.getNodeParameter('gasPrice', i) as number;
+                const gasLimit = this.getNodeParameter('gasLimit', i) as number;
+
+                /* TODO: Try to find a better way to manage the nonce. See https://ethereum.stackexchange.com/questions/39790/concurrency-patterns-for-account-nonce */
+                const nonce = await ethGetTransactionCount.call(this, ETHNetwork, projectID, walletAddress);
 
                 const tx = {
-                    gasPrice: 2000000000,
-                    gasLimit: 185000,
+                    gasPrice: gasPrice,
+                    gasLimit: gasLimit,
                     data: data,
                     to: contractAddress,
-                    nonce: 0,
+                    nonce: nonce,
                 }
                 const signedTransaction = await wallet.signTransaction(tx);
-                let response = await ethSendRawTransaction.call(this, ETHNetwork, projectID, signedTransaction);                
+                let response = await ethSendRawTransaction.call(this, ETHNetwork, projectID, signedTransaction);  
+                const decodedData = iface.decodeFunctionResult(contractMethod, response.result);
+
+                responseData = { decodedData };                             
             }
+            if(operation === 'eth_getTransactionCount') {           
+                let response = await ethGetTransactionCount.call(this, ETHNetwork, projectID, walletAddress);
+                const decodedData = parseInt(response.result, 16);
+
+                responseData = { decodedData };                
+            }            
             if (Array.isArray(responseData)) {
 				returnData.push.apply(returnData, responseData as IDataObject[]);
 			} else {
