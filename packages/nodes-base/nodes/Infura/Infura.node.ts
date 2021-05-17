@@ -12,12 +12,8 @@ import {
 } from 'n8n-workflow';
 
 import {
-    ethBlockNumber,
-    ethGetBlockByNumber,
-    ethCallRequest,
-    ethSendRawTransaction,
-    ethGetTransactionCount,
-    getABIfromEtherscan,
+    infuraApiRequest,
+    getNonce,
     validateJSON,
 } from './GenericFunctions'
 
@@ -131,12 +127,20 @@ export class Infura implements INodeType {
                 description: 'Address of smart contract.',
             },
             {
-                displayName: 'Wallet address',
+                displayName: 'Wallet public address',
                 name: 'walletAddress',
                 type: 'string',
+                displayOptions: {
+                    show: {
+                        operation: [
+                            'eth_call',
+                            'eth_sendRawTransaction',
+                        ],
+                    },
+                },                
                 required: true,
                 default: '',
-                description: 'Address of wallet.',                
+                description: 'Public address of wallet.',                
             },
             {
                 displayName: 'Access wallet by mnemonic phrase',
@@ -295,6 +299,21 @@ export class Infura implements INodeType {
                 description: 'Block number to get information.'
             }, 
             {
+                displayName: 'Tag',
+                name: 'transactionTag',
+                displayOptions: {
+                    show: {
+                        operation: [
+                            'eth_getTransactionCount',
+                        ],
+                    },
+                },
+                required: true,
+                default: 'pending',
+                type: 'string',
+                description: 'An integer block number, or the string "latest", "earliest" or "pending".',
+            },            
+            {
                 displayName: 'Show transaction details?',
                 name: 'showTransactionDetails',
                 displayOptions: {
@@ -332,24 +351,8 @@ export class Infura implements INodeType {
                 });
                 return returnData;
             },
-            async getContractMethodsUsingEtherscan(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]>{
-                const returnData: INodePropertyOptions[] = [];
-
-                const contractAddress = this.getNodeParameter('contractAddress', 0) as string;
-
-                let contractABI = await getABIfromEtherscan.call(this, contractAddress);
-                contractABI.forEach(function(element: any) {
-                    if(element.type === "function"){
-                        returnData.push({
-                            name:  element.name,
-                            value: element.name,
-                        });
-                    }
-                });
-                return returnData;
-            }
-        }
-    }
+        },
+    };
 
     async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
         const items = this.getInputData();
@@ -360,11 +363,18 @@ export class Infura implements INodeType {
         const operation = this.getNodeParameter('operation', 0) as string;
         const ETHNetwork = this.getNodeParameter('ETHNetwork', 0) as string;
         const projectID = this.getNodeParameter('projectID', 0) as string;
+        const url = `https://${ETHNetwork}.infura.io/v3/${projectID}`;
         const walletAddress = this.getNodeParameter('walletAddress', 0) as string;
         
         for (let i = 0; i < length; i++) {
             if (operation === 'eth_blockNumber'){
-                let response = await ethBlockNumber.call(this, ETHNetwork, projectID);
+                const body = {
+                    method: 'eth_blockNumber',
+                    id: 1,
+                    jsonrpc: '2.0',
+                    params: [],
+                };
+                let response = await infuraApiRequest.call(this, body, url);
                 const decodedData = parseInt(response.result, 16);
 
                 responseData = { decodedData };         
@@ -372,13 +382,20 @@ export class Infura implements INodeType {
             if (operation === 'eth_getBlockByNumber'){
                 const blockNumber = this.getNodeParameter('blockNumber', i) as number;
                 const showTransactionDetails = this.getNodeParameter('showTransactionDetails', i) as boolean;
-                let response = await ethGetBlockByNumber.call(this, ETHNetwork, projectID, blockNumber, showTransactionDetails);
+                const body = {
+                    method: 'eth_getBlockByNumber',
+                    id: 1,
+                    jsonrpc: '2.0',
+                    params: [blockNumber, showTransactionDetails],
+                };
+                let response = await infuraApiRequest.call(this, body, url);
                 
                 responseData = response;
             }
             if (operation === 'eth_call') {
 
                 const contractAddress = this.getNodeParameter('contractAddress', 0) as string;
+                const walletAddress = this.getNodeParameter('walletAddress', i) as string;
                 const contractMethod = this.getNodeParameter('contractMethod', i) as string;
                 const contractInputs = this.getNodeParameter('contractInputs', i) as any;
 
@@ -390,7 +407,20 @@ export class Infura implements INodeType {
                 const iface = new ethers.utils.Interface(ABIjson);
                 const data = iface.encodeFunctionData(contractMethod, validateJSON(contractInputs));
 
-                let response = await ethCallRequest.call(this, ETHNetwork, projectID, contractAddress, walletAddress, data);
+                const body = {
+                    method: 'eth_call',
+                    id: 1,
+                    jsonrpc: '2.0',
+                    params: [
+                        {
+                            to: contractAddress,
+                            from: walletAddress,
+                            data: data /* 32 bytes block with the initial 4-byte being the signature */
+                        },
+                        'latest'
+                    ]
+                };
+                let response = await infuraApiRequest.call(this, body, url);
                 const decodedData = iface.decodeFunctionResult(contractMethod, response.result);
 
                 responseData = { decodedData };
@@ -424,7 +454,7 @@ export class Infura implements INodeType {
                 const gasLimit = this.getNodeParameter('gasLimit', i) as number;
 
                 /* TODO: Try to find a better way to manage the nonce. See https://ethereum.stackexchange.com/questions/39790/concurrency-patterns-for-account-nonce */
-                const nonce = await ethGetTransactionCount.call(this, ETHNetwork, projectID, walletAddress);
+                const nonce = await getNonce.call(this, walletAddress, url);
 
                 const tx = {
                     gasPrice: gasPrice,
@@ -434,13 +464,27 @@ export class Infura implements INodeType {
                     nonce: nonce,
                 }
                 const signedTransaction = await wallet.signTransaction(tx);
-                let response = await ethSendRawTransaction.call(this, ETHNetwork, projectID, signedTransaction);  
+                const body = {
+                    method: 'eth_sendRawTransaction',
+                    id: 1,
+                    jsonrpc: '2.0',
+                    params: [signedTransaction]
+                };                
+                let response = await infuraApiRequest.call(this, body, url);
                 const decodedData = iface.decodeFunctionResult(contractMethod, response.result);
 
                 responseData = { decodedData };                             
             }
             if(operation === 'eth_getTransactionCount') {           
-                let response = await ethGetTransactionCount.call(this, ETHNetwork, projectID, walletAddress);
+                const walletAddress = this.getNodeParameter('walletAddress', i) as string;
+                const transactionTag = this.getNodeParameter('transactionTag', i) as string;
+                const body = {
+                    method: 'eth_getTransactionCount',
+                    id: 1,
+                    jsonrpc: '2.0',
+                    params: [walletAddress, transactionTag]
+                };
+                let response = await infuraApiRequest.call(this, body, url);
                 const decodedData = parseInt(response.result, 16);
 
                 responseData = { decodedData };                
