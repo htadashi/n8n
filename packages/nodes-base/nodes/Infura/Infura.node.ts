@@ -38,12 +38,12 @@ export class Infura implements INodeType {
 			// Node properties which the user gets displayed and
 			// can change on the node.
 			{
-				displayName: 'ETH Network',
+				displayName: 'Ethereum Network',
 				name: 'ethNetwork',
 				type: 'options',
 				options: [
 					{
-						name: 'Main Net',
+						name: 'Main net',
 						value: 'mainnet',
 					},
 					{
@@ -68,113 +68,168 @@ export class Infura implements INodeType {
 				description: 'Network of Ethereum client provider.',
 			},
 			{
-				displayName: 'Infura Project ID',
-				name: 'projectID',
-				type: 'string',
-				required: true,
-				default: '',
-				description: 'Infura Project ID.',
-			},
-			{
 				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				options: [
 					{
 						name: 'Get latest block number',
-						value: 'eth_blockNumber',
+						value: 'operationGetBlockNumber',
 					},
 					{
 						name: 'Get block by number',
-						value: 'eth_getBlockByNumber',
+						value: 'operationGetBlockByNumber',
 					},
 					{
 						name: 'Estimate gas price',
-						value: 'eth_estimateGas',
+						value: 'operationEstimateGas',
 					},
 					{
-						name: 'Call smart contract',
-						value: 'eth_call',
+						name: 'Call smart contract function',
+						value: 'operationCallContract',
 					},
 					{
-						name: 'Send raw transaction',
-						value: 'eth_sendRawTransaction',
+						name: 'Send transaction',
+						value: 'operationSendTransaction',
 					},
 					{
 						name: 'Get transaction count',
-						value: 'eth_getTransactionCount',
+						value: 'operationGetTransactionCount',
 					},
 				],
-				default: 'eth_blockNumber',
+				default: 'operationGetBlockNumber',
 				required: true,
-				description: 'JSON-RPC operation to execute.',
+				description: 'Operation to execute.',
 			},
 			{
-				displayName: 'Contract address',
-				name: 'contractAddress',
+				displayName: 'Recipient Address',
+				name: 'recipientAddress',
 				type: 'string',
 				displayOptions: {
 					show: {
-						operation: ['eth_call', 'eth_sendRawTransaction'],
+						operation: ['operationCallContract','operationSendTransaction'],
 					},
 				},
 				required: true,
 				default: '',
-				description: 'Address of smart contract.',
+				description: 'Address of smart contract or recipient wallet.',
 			},
 			{
-				displayName: 'Wallet public address',
+				displayName: 'Wallet Public Address',
 				name: 'walletAddress',
 				type: 'string',
 				displayOptions: {
 					show: {
-						operation: ['eth_getTransactionCount'],
+						operation: ['operationGetTransactionCount'],
 					},
 				},
 				required: true,
 				default: '',
 				description: 'Public address of wallet.',
+			},			
+			{
+				displayName: 'Contract ABI',
+				name: 'contractABI',
+				type: 'json',
+				displayOptions: {
+					show: {
+						operation: ['operationCallContract'],
+					},
+				},
+				required: true,
+				default: '',
+				description: 'Contract ABI in JSON format.',
 			},
 			{
-				displayName: 'Access wallet by mnemonic phrase',
+				displayName: 'Function Type',
+				name: 'stateMutability',
+				type: 'options',
+				displayOptions: {
+					show: {
+						operation: ['operationCallContract'],
+					},
+				},
+				options: [
+					{
+						name: 'Pure/View',
+						value: 'pureOrView',
+					},
+					{
+						name: 'Non-payable',
+						value: 'nonpayable',
+					},
+					{
+						name: 'Payable',
+						value: 'payable',
+					},
+				],
+				default: 'Pure/View',
+				description: 'State mutability of function',
+			},
+			{
+				displayName: 'Mnemonic Access',
 				name: 'accessWalletByMnemonic',
 				type: 'boolean',
 				displayOptions: {
 					show: {
-						operation: ['eth_sendRawTransaction'],
+						operation: ['operationCallContract','operationSendTransaction'],
+					},
+					hide: {
+						stateMutability: ['pureOrView'],
 					},
 				},
 				default: false,
 				description: 'If wallet is accessed by mnemonic phrase or private key.',
 			},
 			{
-				displayName: 'Wallet private key',
+				displayName: 'Wallet Private Key',
 				name: 'walletPrivateKey',
 				type: 'string',
 				displayOptions: {
 					show: {
-						operation: ['eth_sendRawTransaction'],
+						operation: ['operationCallContract','operationSendTransaction'],
 						accessWalletByMnemonic: [false],
 					},
+					hide: {
+						stateMutability: ['pureOrView'],
+					},					
 				},
 				required: true,
 				default: '',
 				description: 'Private key associated to the wallet',
 			},
 			{
-				displayName: 'Wallet mnemonic',
+				displayName: 'Wallet Mnemonic',
 				name: 'walletMnemonic',
 				type: 'string',
 				displayOptions: {
 					show: {
-						operation: ['eth_sendRawTransaction'],
+						operation: ['operationCallContract','operationSendTransaction'],
 						accessWalletByMnemonic: [true],
 					},
+					hide: {
+						stateMutability: ['pureOrView'],
+					},							
 				},
 				required: true,
 				default: '',
 				description: 'Mnemonic associated to the wallet',
 			},
+			{
+				displayName: '👨🏻‍🔧 Setup Gas',
+				name: 'configureGasManually',
+				type: 'boolean',
+				displayOptions: {
+					show: {
+						operation: ['operationCallContract','operationSendTransaction'],
+					},
+					hide: {
+						stateMutability: ['pureOrView'],
+					},							
+				},
+				default: false,
+				description: 'If true, the user can set up the value for gas limit and price. Otherwise, use default values for gas limit and price.',
+			},						
 			{
 				displayName: '⛽ Gas Limit',
 				name: 'gasLimit',
@@ -185,8 +240,12 @@ export class Infura implements INodeType {
 				},
 				displayOptions: {
 					show: {
-						operation: ['eth_sendRawTransaction'],
+						operation: ['operationCallContract','operationSendTransaction'],
+						configureGasManually: [true],
 					},
+					hide: {
+						stateMutability: ['pureOrView'],
+					},							
 				},
 				required: true,
 				default: 21000,
@@ -202,56 +261,66 @@ export class Infura implements INodeType {
 				},
 				displayOptions: {
 					show: {
-						operation: ['eth_sendRawTransaction'],
+						operation: ['operationCallContract','operationSendTransaction'],
+						configureGasManually: [true],
 					},
+					hide: {
+						stateMutability: ['pureOrView'],
+					},							
 				},
 				required: true,
 				default: 45,
 				description: 'Gas price for transaction',
 			},
 			{
-				displayName: 'Contract ABI',
-				name: 'contractABI',
-				type: 'json',
+				displayName: 'Ξ Value (ETH)',
+				name: 'payValue',
+				type: 'number',
+				typeOptions: {
+					minValue: 0,
+				},
 				displayOptions: {
 					show: {
-						operation: ['eth_call', 'eth_sendRawTransaction'],
+						operation: ['operationCallContract','operationSendTransaction'],
 					},
+					hide: {
+						stateMutability: ['pureOrView', 'nonpayable'],
+					},							
 				},
 				required: true,
-				default: '',
-				description: 'Contract ABI in JSON format.',
-			},
+				default: 0,
+				description: 'Value to send for transaction',
+			},						
 			{
-				displayName: 'Contract Method',
-				name: 'contractMethod',
+				displayName: 'Contract Function',
+				name: 'contractFunction',
 				type: 'options',
 				displayOptions: {
 					show: {
-						operation: ['eth_call', 'eth_sendRawTransaction'],
+						operation: ['operationCallContract'],
 					},
 				},
 				typeOptions: {
-					loadOptionsDependsOn: ['contractABI'],
+					loadOptionsDependsOn: ['contractABI','stateMutability'],
 					loadOptionsMethod: 'getContractMethods',
 				},
 				options: [],
 				required: true,
 				default: '',
-				description: 'Method of contract.',
+				description: 'Smart contract function to called.',
 			},
 			{
 				displayName: 'Inputs',
 				name: 'contractInputs',
 				displayOptions: {
 					show: {
-						operation: ['eth_call', 'eth_sendRawTransaction'],
+						operation: ['operationCallContract'],
 					},
 				},
 				type: 'json',
 				required: false,
 				default: '',
-				description: 'Inputs of contract method.',
+				description: 'Inputs for the selected smart contract function.',
 			},
 			{
 				displayName: 'Custom Fields',
@@ -261,16 +330,16 @@ export class Infura implements INodeType {
 				typeOptions: {
 					multipleValues: true,
 				},
-				placeholder: 'Add Input',
+				placeholder: 'Add Contract Input',
 				displayOptions: {
 					show: {
-						operation: ['eth_call', 'eth_sendRawTransaction'],
+						operation: ['operationCallContract'],
 					},
 				},
 				options: [
 					{
 						name: 'customFieldsUi',
-						displayName: 'Contract method inputs',
+						displayName: 'Smart Contract Function Inputs',
 						values: [
 							{
 								displayName: 'Field',
@@ -298,11 +367,11 @@ export class Infura implements INodeType {
 				name: 'blockNumber',
 				displayOptions: {
 					show: {
-						operation: ['eth_getBlockByNumber'],
+						operation: ['operationGetBlockByNumber'],
 					},
 				},
 				required: true,
-				default: 100,
+				default: 0,
 				type: 'number',
 				description: 'Block number to get information.',
 			},
@@ -311,7 +380,7 @@ export class Infura implements INodeType {
 				name: 'transactionTag',
 				displayOptions: {
 					show: {
-						operation: ['eth_getTransactionCount'],
+						operation: ['operationGetTransactionCount'],
 					},
 				},
 				required: true,
@@ -336,8 +405,10 @@ export class Infura implements INodeType {
 				if (json === undefined) {
 					throw new Error('Invalid JSON');
 				}
+				const stateMutability = this.getNodeParameter('stateMutability', 0) as string;				
 				json.forEach((element: any) => {
-					if (element.type === 'function') {
+					if (element.type === 'function' &&
+					(element.stateMutability === stateMutability || (stateMutability === 'pureOrView' && (element.stateMutability === 'pure' || element.stateMutability === 'view')))) {
 						returnData.push({
 							name: element.name,
 							value: element.name,
@@ -381,7 +452,6 @@ export class Infura implements INodeType {
 
 		const operation = this.getNodeParameter('operation', 0) as string;
 		const ethNetwork = this.getNodeParameter('ethNetwork', 0) as string;
-		const projectID = this.getNodeParameter('projectID', 0) as string;
 
 		let provider: ethers.providers.InfuraProvider;
 		try {
@@ -393,7 +463,7 @@ export class Infura implements INodeType {
 				);
 			} else {
 				provider = new ethers.providers.InfuraProvider(ethNetwork, {
-					projectId: projectID,
+					projectId: credentials.projectID,
 					projectSecret: credentials.projectSecret,
 				});
 			}
@@ -402,121 +472,84 @@ export class Infura implements INodeType {
 		}
 
 		for (let i = 0; i < length; i++) {
-			if (operation === 'eth_blockNumber') {
+			if (operation === 'operationGetBlockNumber') {
 				const response = await provider.getBlockNumber();
 				responseData = { blockNumber: response };
 			}
-			if (operation === 'eth_getBlockByNumber') {
+			if (operation === 'operationGetBlockByNumber') {
 				const blockNumber = this.getNodeParameter('blockNumber', i) as number;
 				const response = await provider.getBlock(blockNumber);
 
 				responseData = response;
 			}
-			if (operation === 'eth_call') {
-				const contractAddress = this.getNodeParameter(
-					'contractAddress',
-					0,
-				) as string;
-				const contractMethod = this.getNodeParameter(
-					'contractMethod',
-					i,
-				) as string;
-				let contractInputs = validateJSON(
-					this.getNodeParameter('contractInputs', i) as any,
-				);
-				if (!contractInputs) {
-					contractInputs = [];
-				}
-				const abiJSON = validateJSON(
-					this.getNodeParameter('contractABI', 0) as string,
-				);
-				if (abiJSON === undefined) {
-					throw new Error('Invalid JSON');
-				}
-
-				const iface = new ethers.utils.Interface(abiJSON);
-				const contract = new ethers.Contract(
-					contractAddress,
-					abiJSON,
-					provider,
-				);
-				const response = await contract[contractMethod](...contractInputs);
-
-				let decodedData: ethers.utils.Result | null;
-				if (response.result) {
-					decodedData = iface.decodeFunctionResult(
-						contractMethod,
-						response.result,
-					);
-				} else {
-					decodedData = null;
-				}
-
-				responseData = { decodedData };
-			}
-			if (operation === 'eth_sendRawTransaction') {
-				const contractAddress = this.getNodeParameter(
-					'contractAddress',
-					0,
-				) as string;
-				const contractMethod = this.getNodeParameter(
-					'contractMethod',
-					i,
-				) as string;
-				let contractInputs = validateJSON(
-					this.getNodeParameter('contractInputs', i) as any,
-				);
-				if (!contractInputs) {
-					contractInputs = [];
-				}
-				const accessWalletByMnemonic = this.getNodeParameter(
-					'accessWalletByMnemonic',
-					i,
-				) as boolean;
+			if (operation === 'operationSendTransaction') {
+				const recipientAddress = this.getNodeParameter('recipientAddress', i) as string;
+				const payValue = this.getNodeParameter('payValue', i) as number;
+				const accessWalletByMnemonic = this.getNodeParameter('accessWalletByMnemonic', i) as boolean;
 				let wallet: ethers.Wallet;
 				if (accessWalletByMnemonic) {
-					const walletMnemonic = this.getNodeParameter(
-						'walletMnemonic',
-						i,
-					) as string;
+					const walletMnemonic = this.getNodeParameter('walletMnemonic', i) as string;
 					wallet = ethers.Wallet.fromMnemonic(walletMnemonic);
 				} else {
-					const walletPrivateKey = this.getNodeParameter(
-						'walletPrivateKey',
-						i,
-					) as string;
+					const walletPrivateKey = this.getNodeParameter('walletPrivateKey', i) as string;
 					wallet = new ethers.Wallet(walletPrivateKey);
 				}
 				wallet = wallet.connect(provider);
 
-				const abiJSON = validateJSON(
-					this.getNodeParameter('contractABI', 0) as string,
+				const tx = {
+					to: recipientAddress,
+					value: ethers.utils.parseEther(payValue.toString()),
+				};
+				const transaction = await wallet.sendTransaction(tx);
+				const transactionReceipt = await provider.waitForTransaction(transaction.hash);				  
+
+				responseData = transactionReceipt;
+			}
+			if (operation === 'operationCallContract') {
+				const recipientAddress = this.getNodeParameter('recipientAddress', i) as string;
+				const payValue = this.getNodeParameter('payValue', i) as string;
+				const contractMethod = this.getNodeParameter('contractMethod', i) as string;
+				let contractInputs = validateJSON(
+					this.getNodeParameter('contractInputs', i) as any,
 				);
+				if (!contractInputs) {
+					contractInputs = [];
+				}
+				const accessWalletByMnemonic = this.getNodeParameter('accessWalletByMnemonic', i) as boolean;
+				let wallet: ethers.Wallet;
+				if (accessWalletByMnemonic) {
+					const walletMnemonic = this.getNodeParameter('walletMnemonic', i) as string;
+					wallet = ethers.Wallet.fromMnemonic(walletMnemonic);
+				} else {
+					const walletPrivateKey = this.getNodeParameter('walletPrivateKey', i) as string;
+					wallet = new ethers.Wallet(walletPrivateKey);
+				}
+				wallet = wallet.connect(provider);
+
+				const abiJSON = validateJSON(this.getNodeParameter('contractABI', i) as string);
 				if (abiJSON === undefined) {
 					throw new Error('Invalid JSON');
 				}
 
-				const iface = new ethers.utils.Interface(abiJSON);
 				const gasPrice = this.getNodeParameter('gasPrice', i) as number;
 				const gasLimit = this.getNodeParameter('gasLimit', i) as number;
+				const configureGasManually = this.getNodeParameter('configureGasManually', i) as boolean;
+				const overrides : any = {};
+				if(configureGasManually){
+					overrides.gasPrice = ethers.BigNumber.from(gasPrice);
+					overrides.gasLimit = ethers.BigNumber.from(gasLimit);
+				}
+				if(payValue){
+					overrides.value = ethers.utils.parseEther(payValue);
+				}
 
-				const contract = new ethers.Contract(contractAddress, abiJSON, wallet);
-				const response = await contract[contractMethod](...contractInputs);
-				// {
-				// 		gasLimit,
-				// 		gasPrice,
-				// });
+				const contract = new ethers.Contract(recipientAddress, abiJSON, wallet);
+				const response = await contract[contractMethod](...contractInputs, overrides);
 				responseData = { response };
 			}
-			if (operation === 'eth_getTransactionCount') {
-				const walletAddress = this.getNodeParameter(
-					'walletAddress',
-					i,
-				) as string;
-				const transactionTag = this.getNodeParameter(
-					'transactionTag',
-					i,
-				) as string;
+			if (operation === 'operationGetTransactionCount') {
+				const walletAddress = this.getNodeParameter('walletAddress', i) as string;
+				const transactionTag = this.getNodeParameter('transactionTag', i) as string;
 
 				const response = await provider.getTransactionCount(
 					walletAddress,
@@ -524,7 +557,7 @@ export class Infura implements INodeType {
 				);
 				responseData = { transactionCount: response };
 			}
-			if (operation === 'eth_estimateGas') {
+			if (operation === 'operationEstimateGas') {
 				const gasPrice = await provider.getGasPrice();
 				responseData = { gasPrice: ethers.utils.formatUnits(gasPrice, 'gwei') };
 			}

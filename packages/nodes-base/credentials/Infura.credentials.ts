@@ -9,10 +9,16 @@ export class Infura implements ICredentialType {
 		documentationUrl = 'Infura';
 		properties = [
 				{
-						displayName: 'Project Secret',
-						name: 'projectSecret',
-						type: 'string' as NodePropertyTypes,
-						default: '',
+					displayName: 'Project ID',
+					name: 'projectID',
+					type: 'string' as NodePropertyTypes,
+					default: '',
 				},
+				{
+					displayName: 'Project Secret',
+					name: 'projectSecret',
+					type: 'string' as NodePropertyTypes,
+					default: '',
+				},				
 		];
 }
