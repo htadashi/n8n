@@ -293,7 +293,7 @@ export class Infura implements INodeType {
 			},						
 			{
 				displayName: 'Contract Function',
-				name: 'contractFunction',
+				name: 'contractMethod',
 				type: 'options',
 				displayOptions: {
 					show: {
@@ -304,7 +304,6 @@ export class Infura implements INodeType {
 					loadOptionsDependsOn: ['contractABI','stateMutability'],
 					loadOptionsMethod: 'getContractMethods',
 				},
-				options: [],
 				required: true,
 				default: '',
 				description: 'Smart contract function to called.',
@@ -506,15 +505,16 @@ export class Infura implements INodeType {
 				responseData = transactionReceipt;
 			}
 			if (operation === 'operationCallContract') {
-				const recipientAddress = this.getNodeParameter('recipientAddress', i) as string;
-				const payValue = this.getNodeParameter('payValue', i) as string;
+				const recipientAddress = this.getNodeParameter('recipientAddress', i) as string;							
 				const contractMethod = this.getNodeParameter('contractMethod', i) as string;
+				
 				let contractInputs = validateJSON(
 					this.getNodeParameter('contractInputs', i) as any,
-				);
+				);				
 				if (!contractInputs) {
 					contractInputs = [];
 				}
+				
 				const accessWalletByMnemonic = this.getNodeParameter('accessWalletByMnemonic', i) as boolean;
 				let wallet: ethers.Wallet;
 				if (accessWalletByMnemonic) {
@@ -531,15 +531,17 @@ export class Infura implements INodeType {
 					throw new Error('Invalid JSON');
 				}
 
-				const gasPrice = this.getNodeParameter('gasPrice', i) as number;
-				const gasLimit = this.getNodeParameter('gasLimit', i) as number;
 				const configureGasManually = this.getNodeParameter('configureGasManually', i) as boolean;
-				const overrides : any = {};
+				const overrides : ethers.PayableOverrides  = {};
 				if(configureGasManually){
+					const gasPrice = this.getNodeParameter('gasPrice', i) as number;
+					const gasLimit = this.getNodeParameter('gasLimit', i) as number;					
 					overrides.gasPrice = ethers.BigNumber.from(gasPrice);
 					overrides.gasLimit = ethers.BigNumber.from(gasLimit);
 				}
-				if(payValue){
+				const stateMutability = this.getNodeParameter('stateMutability', 0) as string;
+				if(stateMutability === 'payable'){
+					const payValue = this.getNodeParameter('payValue', i) as string;
 					overrides.value = ethers.utils.parseEther(payValue);
 				}
 
